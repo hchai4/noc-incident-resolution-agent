@@ -1,0 +1,19 @@
+# Core LangChain & Vector Store
+langchain-core>=0.2.0
+langchain-openai>=0.1.7
+langchain-community>=0.2.0
+chromadb>=0.5.0
+
+# LLM Framework & Schema Validation
+pydantic>=2.7.0
+openai>=1.30.0
+
+# Evaluation & Testing Harness
+deepeval>=1.0.0
+pytest>=8.0.0
+
+# API & Dashboard
+fastapi>=0.111.0
+uvicorn>=0.30.0
+streamlit>=1.35.0
+python-dotenv>=1.0.0
