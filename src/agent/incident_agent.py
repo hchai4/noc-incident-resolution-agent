@@ -19,13 +19,16 @@ class IncidentAgent:
     def __init__(self, model_name: str = "gpt-4o-mini"):
         self.model_name = model_name
 
-    def process_alarm(self, alarm: AlarmPayload) -> Tuple[IncidentNotificationDraft, Dict[str, Any], str]:
+    def process_alarm(
+        self, alarm: AlarmPayload
+    ) -> Tuple[IncidentNotificationDraft, Dict[str, Any], str, Dict[str, bool]]:
         """
         Executes end-to-end incident drafting:
         1. Telemetry Context Injection (SQL)
         2. SOP Runbook Retrieval (ChromaDB RAG)
         3. Constrained LLM Generation (Pydantic via Instructor)
-        Returns: (draft, circuit_metadata, retrieved_context)
+        4. Deterministic guardrails
+        Returns: (draft, circuit_metadata, retrieved_context, guardrail_report)
         """
         # Step 1: Structured Telemetry Lookup (Ground Truth)
         circuit = get_circuit_details(alarm.circuit_id)
@@ -72,7 +75,6 @@ RETRIEVED OPERATIONAL RUNBOOK (SOP):
 Draft the formal customer notification following the IncidentNotificationDraft schema.
 """
 
-# Modify the return block of process_alarm in src/agent/incident_agent.py:
         # Step 4: Structured Output Inference
         raw_draft: IncidentNotificationDraft = client.chat.completions.create(
             model=self.model_name,

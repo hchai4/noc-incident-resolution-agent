@@ -70,7 +70,6 @@ SOP corpus:
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-pip install instructor   # used by src/agent/incident_agent.py, not listed in requirements.txt
 ```
 
 Create a `.env` in the repo root:

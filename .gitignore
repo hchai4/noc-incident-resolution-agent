@@ -5,4 +5,7 @@ __pycache__/
 .DS_Store
 *.chroma
 chroma_db/
+data/chroma_db/
+data/*.db
+*.db
 .pytest_cache/
