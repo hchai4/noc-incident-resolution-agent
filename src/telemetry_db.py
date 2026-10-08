@@ -73,7 +73,8 @@ def initialize_telemetry_db():
         )
     ]
 
-    with get_db_connection() as conn:
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
         cursor.executescript(schema_sql)
         cursor.executemany(
@@ -86,6 +87,8 @@ def initialize_telemetry_db():
             sample_circuits
         )
         conn.commit()
+    finally:
+        conn.close()
 
     print(f"✅ Telemetry DB initialized with {len(sample_circuits)} enterprise circuits.")
 
@@ -95,13 +98,14 @@ def get_circuit_details(circuit_id: str) -> Optional[Dict[str, Any]]:
     Fetches ground-truth circuit metadata by circuit_id.
     """
     query = "SELECT * FROM circuits WHERE circuit_id = ?;"
-    with get_db_connection() as conn:
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
         cursor.execute(query, (circuit_id,))
         row = cursor.fetchone()
-        if row:
-            return dict(row)
-    return None
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

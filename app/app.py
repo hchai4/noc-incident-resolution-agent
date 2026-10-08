@@ -9,9 +9,11 @@ if str(_PROJECT_ROOT) not in sys.path:
 import streamlit as st
 import datetime
 from dotenv import load_dotenv
+from ulid import ULID
 
 from src.schemas import AlarmPayload
 from src.telemetry_db import get_circuit_details, get_db_connection
+from src.agent.guardrails import GuardrailViolation
 from src.agent.incident_agent import IncidentAgent
 
 load_dotenv()
@@ -33,13 +35,6 @@ st.markdown("""
         padding: 12px;
         margin-bottom: 10px;
     }
-    .badge-pass {
-        color: #0f5132;
-        background-color: #d1e7dd;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-weight: bold;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,15 +48,20 @@ agent = load_agent()
 
 
 def fetch_all_circuits():
-    with get_db_connection() as conn:
+    conn = get_db_connection()
+    try:
         cursor = conn.cursor()
-        cursor.execute("SELECT circuit_id, client_name, client_tier, contracted_sla_hours FROM circuits")
-        return cursor.fetchall()
+        cursor.execute(
+            "SELECT circuit_id, client_name, client_tier, contracted_sla_hours FROM circuits"
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
 
 
 # Header
 st.title("📡 NOC Incident Resolution & Dispatch Copilot")
-st.caption("Grounded Enterprise RAG & Automated LLM Evaluation Harness | Human-in-the-Loop (HITL)")
+st.caption("Grounded enterprise RAG | Human-in-the-loop dispatch")
 st.divider()
 
 # Layout: 3 Columns
@@ -107,31 +107,39 @@ with col_left:
         height=100
     )
 
-    generate_btn = st.button("⚡ Generate Incident Draft", type="primary", use_container_width=True)
+    generate_btn = st.button("Generate incident draft", type="primary", width="stretch")
 
 # State initialization
 if "draft_result" not in st.session_state:
     st.session_state.draft_result = None
+if "guardrail_error" not in st.session_state:
+    st.session_state.guardrail_error = None
 
 # Trigger Agent Execution
 if generate_btn:
     with st.spinner("Executing RAG retrieval and structured drafting..."):
         current_time = datetime.datetime.now(datetime.timezone.utc).isoformat()
         alarm = AlarmPayload(
-            incident_id=f"INC-{datetime.datetime.now().strftime('%M%S')}",
+            incident_id=f"INC-{ULID()}",
             circuit_id=selected_circuit_id,
             alarm_type=alarm_type,
             raw_symptom=raw_symptom,
             detected_at=current_time
         )
-        draft, circuit, sop_context, guardrails = agent.process_alarm(alarm)
-        st.session_state.draft_result = {
-            "draft": draft,
-            "circuit": circuit,
-            "sop_context": sop_context,
-            "guardrails": guardrails,
-            "alarm": alarm
-        }
+        try:
+            draft, circuit, sop_context, guardrails = agent.process_alarm(alarm)
+        except GuardrailViolation as exc:
+            st.session_state.draft_result = None
+            st.session_state.guardrail_error = str(exc)
+        else:
+            st.session_state.guardrail_error = None
+            st.session_state.draft_result = {
+                "draft": draft,
+                "circuit": circuit,
+                "sop_context": sop_context,
+                "guardrails": guardrails,
+                "alarm": alarm
+            }
 
 # ==============================================================================
 # CENTER PANEL: Knowledge Citations & Generated Draft
@@ -139,31 +147,34 @@ if generate_btn:
 with col_center:
     st.subheader("2. Grounded Incident Response Draft")
 
-    if st.session_state.draft_result:
+    if st.session_state.guardrail_error:
+        st.error(st.session_state.guardrail_error)
+        st.caption("No customer email was drafted.")
+    elif st.session_state.draft_result:
         res = st.session_state.draft_result
         draft = res["draft"]
 
-        with st.expander("🔍 View Retrieved Runbook Citations (ChromaDB Context)", expanded=False):
+        with st.expander("View retrieved runbook citations", expanded=False):
             st.markdown(res["sop_context"])
 
         st.markdown(f"**Ticket:** `{draft.incident_id}` | **Severity:** `{draft.severity}`")
-        st.markdown(f"**Identified Root Cause:** {draft.root_cause_category}")
-        st.markdown(f"**Technical Mitigation Taken:** {draft.mitigation_action_taken}")
+        st.markdown(f"**Identified root cause:** {draft.root_cause_category}")
+        st.markdown(f"**Technical mitigation taken:** {draft.mitigation_action_taken}")
 
-        st.markdown("### Customer Notification Email Body")
-        edited_email = st.text_area(
-            "Review and edit draft communication before dispatch:",
+        st.markdown("### Customer notification email")
+        st.text_area(
+            "Review and edit the draft before marking it reviewed:",
             value=draft.notification_email_body,
             height=260
         )
 
-        dispatch_clicked = st.button("🚀 One-Click Dispatch to Customer", type="primary", use_container_width=True)
-        if dispatch_clicked:
-            st.balloons()
-            st.success(f"✅ Notification successfully dispatched to {res['circuit']['contact_email']}!")
-            st.info(f"Audit Log Recorded: Incident ticket {draft.incident_id} marked as ACTIVE_DISPATCHED.")
+        reviewed = st.button("Mark reviewed (no email is sent)", type="primary", width="stretch")
+        if reviewed:
+            st.success(
+                f"Marked reviewed in this session. No email was sent to {res['circuit']['contact_email']}."
+            )
     else:
-        st.info("👈 Select a circuit anomaly alert on the left and click **'Generate Incident Draft'**.")
+        st.info("Select a circuit alarm on the left and click **Generate incident draft**.")
 
 # ==============================================================================
 # RIGHT PANEL: Quality Badges & Evaluation Scorecard
@@ -171,41 +182,48 @@ with col_center:
 with col_right:
     st.subheader("3. Production Safety Guardrails")
 
-    if st.session_state.draft_result:
+    if st.session_state.guardrail_error:
+        st.markdown("**Tenant isolation**")
+        st.badge("Failed", icon=":material/close:", color="red")
+        st.caption(st.session_state.guardrail_error)
+        st.markdown("**SLA cadence**")
+        st.badge("Not evaluated", icon=":material/remove:", color="gray")
+    elif st.session_state.draft_result:
         res = st.session_state.draft_result
         draft = res["draft"]
         checks = res["guardrails"]
+        max_minutes = res["circuit"]["contracted_sla_hours"] * 60
 
-        st.markdown("#### Programmatic Guardrails")
-        st.markdown(
-            f"**Tenant Isolation:** <span class='badge-pass'>PASSED</span>",
-            unsafe_allow_html=True
-        )
+        st.markdown("**Tenant isolation**")
+        if checks["tenant_isolation_passed"]:
+            st.badge("Passed", icon=":material/check:", color="green")
+        else:
+            st.badge("Failed", icon=":material/close:", color="red")
         st.caption(f"Target match: {draft.client_name} ({draft.circuit_id})")
 
-        st.markdown(
-            f"**SLA Cadence Guardrail:** <span class='badge-pass'>PASSED</span>",
-            unsafe_allow_html=True
-        )
-        st.caption(
-            f"Next update scheduled: every {draft.next_update_window_minutes} mins (Allowed: <= {res['circuit']['contracted_sla_hours'] * 60} mins)"
-        )
+        st.markdown("**SLA cadence**")
+        if checks.get("auto_remediated"):
+            st.badge("Passed (clamped)", icon=":material/warning:", color="orange")
+            st.caption(
+                f"Next update every {draft.next_update_window_minutes} mins. "
+                f"Window was clamped to the {max_minutes}-minute SLA limit."
+            )
+        elif checks["sla_compliance_passed"]:
+            st.badge("Passed", icon=":material/check:", color="green")
+            st.caption(
+                f"Next update every {draft.next_update_window_minutes} mins "
+                f"(allowed: <= {max_minutes} mins)."
+            )
+        else:
+            st.badge("Failed", icon=":material/close:", color="red")
+            st.caption(f"Allowed window is <= {max_minutes} mins.")
 
         st.divider()
-
-        st.markdown("#### DeepEval Quality Metrics")
-        st.metric(
-            label="Faithfulness Score (SOP Grounded)",
-            value="94.2%",
-            delta="+9.2% vs Baseline"
+        st.markdown("**Evaluation**")
+        st.caption(
+            "Faithfulness and hallucination are measured offline in "
+            "`tests/test_rag_evals.py` (DeepEval, threshold 0.85). "
+            "This console does not show a live score."
         )
-        st.caption("Verified: Technical actions directly derived from retrieved operational runbook.")
-
-        st.metric(
-            label="Hallucination Index",
-            value="0.00",
-            delta="Zero Hallucinated ETAs"
-        )
-        st.caption("Verified: Model complied with policy and made no fabricated restoration commitments.")
     else:
-        st.write("Awaiting agent execution to generate evaluation metrics...")
+        st.caption("Awaiting a draft to show guardrail results.")
