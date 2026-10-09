@@ -1,9 +1,11 @@
-from typing import Dict, Any, Tuple
-from src.schemas import IncidentNotificationDraft, AlarmPayload
+from typing import Any
+
+from src.schemas import AlarmPayload, IncidentNotificationDraft
 
 
 class GuardrailViolation(Exception):
     """Raised when an incident draft violates strict operational rules."""
+
     pass
 
 
@@ -17,32 +19,24 @@ def verify_sla_compliance(draft: IncidentNotificationDraft, contracted_sla_hours
 
 
 def verify_tenant_isolation(
-    draft: IncidentNotificationDraft, 
-    alarm: AlarmPayload, 
-    circuit: Dict[str, Any]
+    draft: IncidentNotificationDraft, alarm: AlarmPayload, circuit: dict[str, Any]
 ) -> bool:
     """
     Prevents cross-tenant data leakage by verifying that the drafted entities
     match both the trigger alarm and the database record.
     """
-    matches_circuit = (draft.circuit_id == alarm.circuit_id == circuit["circuit_id"])
-    matches_client = (draft.client_name == circuit["client_name"])
+    matches_circuit = draft.circuit_id == alarm.circuit_id == circuit["circuit_id"]
+    matches_client = draft.client_name == circuit["client_name"]
     return matches_circuit and matches_client
 
 
 def apply_guardrails(
-    draft: IncidentNotificationDraft,
-    alarm: AlarmPayload,
-    circuit: Dict[str, Any]
-) -> Tuple[IncidentNotificationDraft, Dict[str, bool]]:
+    draft: IncidentNotificationDraft, alarm: AlarmPayload, circuit: dict[str, Any]
+) -> tuple[IncidentNotificationDraft, dict[str, bool]]:
     """
     Runs all deterministic verification checks and performs safe remediation.
     """
-    checks = {
-        "tenant_isolation_passed": False,
-        "sla_compliance_passed": False,
-        "auto_remediated": False
-    }
+    checks = {"tenant_isolation_passed": False, "sla_compliance_passed": False, "auto_remediated": False}
 
     # 1. Check Tenant Isolation
     if not verify_tenant_isolation(draft, alarm, circuit):

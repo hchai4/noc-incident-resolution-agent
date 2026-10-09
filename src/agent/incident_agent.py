@@ -1,27 +1,30 @@
 import os
-from typing import Dict, Any, Tuple
+from typing import Any
+
+import instructor
 from dotenv import load_dotenv
 from openai import OpenAI
-import instructor
 
+from src.agent.guardrails import apply_guardrails
+from src.rag.retriever import retrieve_sop_context
 from src.schemas import AlarmPayload, IncidentNotificationDraft
 from src.telemetry_db import get_circuit_details
-from src.rag.retriever import retrieve_sop_context
-from src.agent.guardrails import apply_guardrails
 
 load_dotenv()
 
-# Client wrapper enforcing Pydantic schema completion with auto-retry
-client = instructor.from_openai(OpenAI(api_key=os.getenv("OPENAI_API_KEY")))
-
 
 class IncidentAgent:
-    def __init__(self, model_name: str = "gpt-4o-mini"):
+    def __init__(self, model_name: str = "gpt-4o-mini", client=None):
         self.model_name = model_name
+        if client is None:
+            load_dotenv()
+            api_key = os.environ["OPENAI_API_KEY"]
+            client = instructor.from_openai(OpenAI(api_key=api_key))
+        self.client = client
 
     def process_alarm(
         self, alarm: AlarmPayload
-    ) -> Tuple[IncidentNotificationDraft, Dict[str, Any], str, Dict[str, bool]]:
+    ) -> tuple[IncidentNotificationDraft, dict[str, Any], str, dict[str, bool]]:
         """
         Executes end-to-end incident drafting:
         1. Telemetry Context Injection (SQL)
@@ -76,15 +79,15 @@ Draft the formal customer notification following the IncidentNotificationDraft s
 """
 
         # Step 4: Structured Output Inference
-        raw_draft: IncidentNotificationDraft = client.chat.completions.create(
+        raw_draft: IncidentNotificationDraft = self.client.chat.completions.create(
             model=self.model_name,
             response_model=IncidentNotificationDraft,
             max_retries=2,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content}
+                {"role": "user", "content": user_content},
             ],
-            temperature=0.1
+            temperature=0.1,
         )
 
         # Step 5: Deterministic Guardrail Gate & Remediation

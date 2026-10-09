@@ -1,5 +1,4 @@
 import pytest
-
 from src.agent.guardrails import GuardrailViolation, apply_guardrails
 from src.schemas import AlarmPayload, IncidentNotificationDraft
 

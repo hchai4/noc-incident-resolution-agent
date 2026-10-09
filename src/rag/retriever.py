@@ -1,9 +1,9 @@
 import os
-from typing import List, Dict, Any, Tuple
-from dotenv import load_dotenv
+from typing import Any
 
-from langchain_openai import OpenAIEmbeddings
+from dotenv import load_dotenv
 from langchain_community.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings
 
 load_dotenv()
 
@@ -17,7 +17,7 @@ def get_vector_store() -> Chroma:
     """
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-small",
-        openai_api_key=os.getenv("OPENAI_API_KEY")
+        openai_api_key=os.getenv("OPENAI_API_KEY"),  # type: ignore[call-arg]
     )
     return Chroma(
         collection_name=COLLECTION_NAME,
@@ -27,7 +27,7 @@ def get_vector_store() -> Chroma:
     )
 
 
-def retrieve_sop_context(alarm_query: str, k: int = 2) -> Tuple[str, List[Dict[str, Any]]]:
+def retrieve_sop_context(alarm_query: str, k: int = 2) -> tuple[str, list[dict[str, Any]]]:
     """
     Queries ChromaDB with similarity relevance scoring.
     Returns:
@@ -51,14 +51,13 @@ def retrieve_sop_context(alarm_query: str, k: int = 2) -> Tuple[str, List[Dict[s
             "source_file": source_file,
             "chunk_id": chunk_id,
             "relevance_score": round(float(score), 4),
-            "content": clean_content
+            "content": clean_content,
         }
         raw_evidence.append(evidence_entry)
 
         # Markdown block for LLM prompt context injection
         formatted_context_blocks.append(
-            f"--- CITATION: [{source_file}] (Confidence: {score:.2f}) ---\n"
-            f"{clean_content}\n"
+            f"--- CITATION: [{source_file}] (Confidence: {score:.2f}) ---\n" f"{clean_content}\n"
         )
 
     formatted_context = "\n".join(formatted_context_blocks)
