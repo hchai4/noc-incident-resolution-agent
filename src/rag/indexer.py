@@ -1,13 +1,13 @@
+import glob
 import os
 import re
-import glob
 import shutil
 from pathlib import Path
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 from langchain_community.document_loaders import TextLoader
-from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings
 
 load_dotenv()
 
@@ -44,11 +44,14 @@ def build_alarm_aliases(sop_text: str) -> list[str]:
     """
     title = sop_text.splitlines()[0].strip() if sop_text.strip() else ""
     topic = title.split(":", 1)[-1]
-    topic = re.sub(
-        r"\b(Incident Protocol|Mitigation Protocol|& Facility Transfer|Protocol)\b",
-        "",
-        topic,
-    ).strip(" :") or title
+    topic = (
+        re.sub(
+            r"\b(Incident Protocol|Mitigation Protocol|& Facility Transfer|Protocol)\b",
+            "",
+            topic,
+        ).strip(" :")
+        or title
+    )
 
     symptoms = ""
     actions = ""
@@ -114,7 +117,7 @@ def build_vector_index(force_rebuild: bool = True):
 
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-small",
-        openai_api_key=os.getenv("OPENAI_API_KEY")
+        openai_api_key=os.getenv("OPENAI_API_KEY"),  # type: ignore[call-arg]
     )
 
     os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
@@ -122,7 +125,7 @@ def build_vector_index(force_rebuild: bool = True):
         collection_name=COLLECTION_NAME,
         embedding_function=embeddings,
         persist_directory=CHROMA_PERSIST_DIR,
-        collection_metadata={"hnsw:space": "cosine"}
+        collection_metadata={"hnsw:space": "cosine"},
     )
 
     embed_inputs = []
@@ -138,10 +141,12 @@ def build_vector_index(force_rebuild: bool = True):
         for variant in variants:
             embed_inputs.append(variant)
             stored_docs.append(full_text)
-            metadatas.append({
-                "source_file": source_file,
-                "chunk_id": f"{source_file}#chunk-{idx}",
-            })
+            metadatas.append(
+                {
+                    "source_file": source_file,
+                    "chunk_id": f"{source_file}#chunk-{idx}",
+                }
+            )
             ids.append(f"{source_file}-{idx}")
             idx += 1
 

@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from typing import Optional, Dict, Any
+from typing import Any
 
 DB_PATH = os.getenv("TELEMETRY_DB_PATH", "data/circuits_telemetry.db")
 
@@ -39,7 +39,7 @@ def initialize_telemetry_db():
             "Equinix LA1 (Los Angeles)",
             "Equinix TY2 (Tokyo)",
             "noc-alerts@gs-trading.com",
-            "UP"
+            "UP",
         ),
         (
             "DIA-4410-SFO-JFK",
@@ -49,7 +49,7 @@ def initialize_telemetry_db():
             "Digital Realty SFO",
             "Equinix NY4 (Secaucus)",
             "network-ops@stripe-infra.com",
-            "UP"
+            "UP",
         ),
         (
             "METRO-3301-ORD-CHI",
@@ -59,7 +59,7 @@ def initialize_telemetry_db():
             "Coresite CHI1",
             "Coresite CHI2",
             "it-support@midwestlogistics.com",
-            "UP"
+            "UP",
         ),
         (
             "IPLC-8812-LON-FRA",
@@ -69,8 +69,8 @@ def initialize_telemetry_db():
             "Telehouse London Docklands",
             "Interxion Frankfurt",
             "admin@acmeretail.eu",
-            "UP"
-        )
+            "UP",
+        ),
     ]
 
     conn = get_db_connection()
@@ -84,7 +84,7 @@ def initialize_telemetry_db():
                 origin_location, dest_location, contact_email, circuit_status
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
             """,
-            sample_circuits
+            sample_circuits,
         )
         conn.commit()
     finally:
@@ -93,7 +93,7 @@ def initialize_telemetry_db():
     print(f"✅ Telemetry DB initialized with {len(sample_circuits)} enterprise circuits.")
 
 
-def get_circuit_details(circuit_id: str) -> Optional[Dict[str, Any]]:
+def get_circuit_details(circuit_id: str) -> dict[str, Any] | None:
     """
     Fetches ground-truth circuit metadata by circuit_id.
     """
@@ -110,10 +110,9 @@ def get_circuit_details(circuit_id: str) -> Optional[Dict[str, Any]]:
 
 if __name__ == "__main__":
     initialize_telemetry_db()
-    
+
     # Test query
     test_id = "IEPL-9021-LAX-TYO"
     result = get_circuit_details(test_id)
     print(f"\n[Test Query Result for {test_id}]:")
     print(result)
-    
