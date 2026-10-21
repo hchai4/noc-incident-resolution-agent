@@ -1,0 +1,45 @@
+{"id": "pos-01", "query": "CRITICAL: Loss of Signal (LOS) on Metro Fiber Link LAX-ONT-01", "expected_sop": "sop_fiber_cut_metro.md", "negative": false}
+{"id": "pos-02", "query": "ALARM: OTDR reflection on metro terrestrial duct, construction strike near local KM 3", "expected_sop": "sop_fiber_cut_metro.md", "negative": false}
+{"id": "pos-03", "query": "CRITICAL: metro fiber LOS, municipal excavation sheared the local conduit", "expected_sop": "sop_fiber_cut_metro.md", "negative": false}
+{"id": "pos-04", "query": "ALARM: complete LOS on metro DWDM access ring, dispatch local splice team", "expected_sop": "sop_fiber_cut_metro.md", "negative": false}
+{"id": "pos-05", "query": "CRITICAL: LOS on long-haul DWDM span LAX-PHX, OTDR marker at km 214", "expected_sop": "sop_fiber_cut_longhaul.md", "negative": false}
+{"id": "pos-06", "query": "ALARM: intercity fiber cut between regeneration sites, 80 km span down", "expected_sop": "sop_fiber_cut_longhaul.md", "negative": false}
+{"id": "pos-07", "query": "SCHEDULED: planned fiber splice window, change ticket CHG-441, do not dispatch emergency crew", "expected_sop": "sop_fiber_planned_maintenance.md", "negative": false}
+{"id": "pos-08", "query": "MAINT: overnight optical plant upgrade, customers already notified of the window", "expected_sop": "sop_fiber_planned_maintenance.md", "negative": false}
+{"id": "pos-09", "query": "ALARM: BGP neighbor session down, flapping prefixes detected on border edge", "expected_sop": "sop_bgp_route_leak.md", "negative": false}
+{"id": "pos-10", "query": "ALARM: unintended full-table leak, apply prefix-filter, not a single-session flap", "expected_sop": "sop_bgp_route_leak.md", "negative": false}
+{"id": "pos-11", "query": "CRITICAL: AS-path hijack, we are originating prefixes we do not own", "expected_sop": "sop_bgp_route_leak.md", "negative": false}
+{"id": "pos-12", "query": "ALARM: peer announced our more-specifics, leak not a simple neighbor bounce", "expected_sop": "sop_bgp_route_leak.md", "negative": false}
+{"id": "pos-13", "query": "ALARM: BGP neighbor oscillating Idle/Established, originated prefixes unchanged", "expected_sop": "sop_bgp_session_flap.md", "negative": false}
+{"id": "pos-14", "query": "ALARM: single BGP session flap, BFD timeout, no full-table leak", "expected_sop": "sop_bgp_session_flap.md", "negative": false}
+{"id": "pos-15", "query": "CRITICAL: 80 Gbps volumetric SYN flood, divert to scrubbing center", "expected_sop": "sop_ddos_mitigation.md", "negative": false}
+{"id": "pos-16", "query": "ALARM: DNS amplification, ingress over 50 Gbps, consider RTBH", "expected_sop": "sop_ddos_mitigation.md", "negative": false}
+{"id": "pos-17", "query": "ALARM: distributed botnet saturating the edge peering link in bits per second", "expected_sop": "sop_ddos_mitigation.md", "negative": false}
+{"id": "pos-18", "query": "ALARM: HTTP request flood against one URL, edge link not saturated", "expected_sop": "sop_application_layer_attack.md", "negative": false}
+{"id": "pos-19", "query": "ALARM: credential stuffing and slowloris, WAF challenge, do not blackhole the prefix", "expected_sop": "sop_application_layer_attack.md", "negative": false}
+{"id": "pos-20", "query": "CRITICAL: commercial utility grid collapse, ATS failover, UPS on battery", "expected_sop": "sop_power_outage_datacenter.md", "negative": false}
+{"id": "pos-21", "query": "ALARM: municipal transformer down, confirm diesel start and load transfer", "expected_sop": "sop_power_outage_datacenter.md", "negative": false}
+{"id": "pos-22", "query": "CRITICAL: diesel generator fail-to-start after utility loss, UPS minutes remaining 12", "expected_sop": "sop_generator_fail_over.md", "negative": false}
+{"id": "pos-23", "query": "ALARM: CRAC down, hot aisle 34 C, power and optics still up", "expected_sop": "sop_cooling_failure.md", "negative": false}
+{"id": "pos-24", "query": "POLICY: do not promise a restoration ETA unless field has confirmed, use the SLA update window", "expected_sop": "sop_sla_communication_policy.md", "negative": false}
+{"id": "pos-25", "query": "CRITICAL: recursive DNS SERVFAIL at scale, authoritative zones still healthy", "expected_sop": "sop_dns_resolver_outage.md", "negative": false}
+{"id": "pos-26", "query": "ALARM: NTP offset 250 ms, GNSS holdover expired, Kerberos failing", "expected_sop": "sop_ntp_clock_skew.md", "negative": false}
+{"id": "pos-27", "query": "ALARM: TLS handshake failures, certificate expired, underlay path is up", "expected_sop": "sop_tls_certificate_expiry.md", "negative": false}
+{"id": "pos-28", "query": "ALARM: IX peer port 92 percent utilized, BGP still Established, rising latency", "expected_sop": "sop_peering_congestion.md", "negative": false}
+{"id": "pos-29", "query": "ALARM: single DWDM wavelength LOS, OTDR of the cable is clean, neighbor channels up", "expected_sop": "sop_transponder_failure.md", "negative": false}
+{"id": "pos-30", "query": "ALARM: OSPF neighbor stuck ExStart, MTU mismatch, BGP upstream still up", "expected_sop": "sop_ospf_adjacency_down.md", "negative": false}
+{"id": "pos-31", "query": "ALARM: RSVP LSP down, L3VPN labels missing, IGP and PE BGP still up", "expected_sop": "sop_mpls_lsp_down.md", "negative": false}
+{"id": "pos-32", "query": "ALARM: customer CPE unreachable, PE attachment down, core and access ring healthy", "expected_sop": "sop_customer_cpe_down.md", "negative": false}
+{"id": "pos-33", "query": "ALARM: Equinix IX switch port down, multiple IX peers quiet, core up", "expected_sop": "sop_ixp_port_down.md", "negative": false}
+{"id": "pos-34", "query": "CRITICAL: metro LOS after third-party construction on the local duct path", "expected_sop": "sop_fiber_cut_metro.md", "negative": false}
+{"id": "pos-35", "query": "ALARM: BGP route leak from upstream peer, shut session only after prefix-filter fails", "expected_sop": "sop_bgp_route_leak.md", "negative": false}
+{"id": "neg-01", "query": "Customer emailed asking for a copy of last month's invoice", "expected_sop": null, "negative": true}
+{"id": "neg-02", "query": "Please reset the portal password for the billing user", "expected_sop": null, "negative": true}
+{"id": "neg-03", "query": "HR: submit PTO for next Friday, no circuit impact", "expected_sop": null, "negative": true}
+{"id": "neg-04", "query": "Weather is rainy in Los Angeles, all circuits green, no alarm", "expected_sop": null, "negative": true}
+{"id": "neg-05", "query": "Is the downtown office open on Columbus Day?", "expected_sop": null, "negative": true}
+{"id": "neg-06", "query": "Circuit IEPL-9021-LAX-TYO is silent, no alarm, customer asking for a status just in case", "expected_sop": null, "negative": true}
+{"id": "neg-07", "query": "Sales wants a quote for an additional 10G port next quarter", "expected_sop": null, "negative": true}
+{"id": "neg-08", "query": "Thanks, the incident is resolved, please close the ticket", "expected_sop": null, "negative": true}
+{"id": "neg-09", "query": "Need a colo badge for a vendor arriving at 2pm", "expected_sop": null, "negative": true}
+{"id": "neg-10", "query": "What is our public ASN? No flap, no leak, documentation request", "expected_sop": null, "negative": true}

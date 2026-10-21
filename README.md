@@ -34,9 +34,12 @@ src/rag/indexer.py              Embed SOP runbooks into ChromaDB
 src/rag/retriever.py            Cited SOP retrieval
 src/agent/incident_agent.py     End-to-end drafting pipeline
 src/agent/guardrails.py         Tenant isolation + SLA compliance
-data/noc_runbooks/              Markdown SOP source files
+data/noc_runbooks/              Markdown SOP source files (20; 4 are distractors)
 data/circuits_telemetry.db      Generated SQLite DB (after seed)
 data/chroma_db/                 Generated vector index (after index)
+evals/golden_set.jsonl          45 labeled alarms (35 positive, 10 negative)
+evals/retrieval_metrics.py      hit@1 / hit@2 / MRR / false-positive rate
+evals/results.md                Retrieval baseline numbers
 tests/                          Scenario, retrieval, and DeepEval tests
 ```
 
@@ -76,7 +79,7 @@ SOP corpus is 20 runbooks in `data/noc_runbooks/`. Four of them are near-neighbo
 | `sop_customer_cpe_down.md` | Last-mile CPE |
 | `sop_ixp_port_down.md` | Exchange switch port |
 
-After re-indexing the 20 files, `tests/test_retrieval.py` still ranks `sop_fiber_cut_metro.md` first for the metro LOS query (score 0.8602). The BGP leak query ranks `sop_bgp_session_flap.md` first (score 0.8605) instead of `sop_bgp_route_leak.md`. That miss is the 5→20 baseline; do not tune the retriever to hide it.`
+After re-indexing the 20 files, `tests/test_retrieval.py` still ranks `sop_fiber_cut_metro.md` first for the metro LOS query (score 0.8602). The BGP leak query ranks `sop_bgp_session_flap.md` first (score 0.8605) instead of `sop_bgp_route_leak.md`. That miss is part of the 5→20 baseline; do not tune the retriever to hide it.
 
 ## Prerequisites
 
@@ -122,15 +125,37 @@ Opens at [http://localhost:8501](http://localhost:8501).
 2. Generate an incident draft (RAG + structured LLM output).
 3. Review retrieved runbook citations, edit the customer email, and dispatch.
 
+## Evaluation (retrieval baseline)
+
+`evals/golden_set.jsonl` is the answer key: 45 alarm strings, 35 with one expected SOP and 10 negatives that must not look like a runbook incident. `evals/retrieval_metrics.py` sends each query through `retrieve_sop_context` (`k=2`) and scores filename match. It does not draft mail and does not use DeepEval. Query embedding still needs `OPENAI_API_KEY`.
+
+From the repo root:
+
+```bash
+PYTHONPATH=. uv run python evals/retrieval_metrics.py
+```
+
+Baseline on 2026-10-21 (whole-document + alarm aliases, no hybrid, no rerank), also stored in `evals/results.md`:
+
+| Metric | Value |
+|---|---|
+| hit@1 | 0.771 |
+| hit@2 | 0.914 |
+| MRR | 0.843 |
+| false-positive rate @ 0.65 | 0.000 |
+
+`tests/test_retrieval.py` can still fail on the single BGP leak string. The 45-row table is the number to quote, not that one assert.
+
 ## Tests
 
 ```bash
+PYTHONPATH=. uv run python evals/retrieval_metrics.py  # 45-row retrieval baseline
 pytest -s -v tests/test_retrieval.py      # SOP hit + relevance (BGP leak may fail after 5→20)
 pytest -s -v tests/test_agent_scenarios.py  # fiber / BGP / power scenarios + guardrails
 pytest -s -v tests/test_rag_evals.py      # DeepEval faithfulness / hallucination
 ```
 
-`pytest.ini` sets `pythonpath = .` so `src.*` imports resolve from the repo root.
+`pytest.ini` sets `pythonpath = .` so `src.*` imports resolve from the repo root. The metrics script does not read `pytest.ini`; that is why `PYTHONPATH=.` is required.
 
 DeepEval thresholds in `tests/test_rag_evals.py`:
 
