@@ -51,13 +51,32 @@ tests/                          Scenario, retrieval, and DeepEval tests
 
 Supported alarm types in the UI: `FIBER_CUT`, `BGP_LEAK`, `POWER_FAIL`, `DDOS`.
 
-SOP corpus:
+SOP corpus is 20 runbooks in `data/noc_runbooks/`. Four of them are near-neighbor distractors: long-haul fiber cut, planned fiber maintenance, BGP session flap, and application-layer attack. They share wording with metro fiber, BGP leak, and volumetric DDoS so dense retrieval can pick the wrong sibling.
 
-- `sop_fiber_cut_metro.md`
-- `sop_bgp_route_leak.md`
-- `sop_power_outage_datacenter.md`
-- `sop_ddos_mitigation.md`
-- `sop_sla_communication_policy.md`
+| File | Role |
+|---|---|
+| `sop_fiber_cut_metro.md` | Metro LOS / OTDR |
+| `sop_fiber_cut_longhaul.md` | Distractor for metro cut |
+| `sop_fiber_planned_maintenance.md` | Distractor for metro cut |
+| `sop_bgp_route_leak.md` | Unintended leak / hijack |
+| `sop_bgp_session_flap.md` | Distractor for leak |
+| `sop_ddos_mitigation.md` | Volumetric flood |
+| `sop_application_layer_attack.md` | Distractor for volumetric DDoS |
+| `sop_power_outage_datacenter.md` | Utility / UPS |
+| `sop_generator_fail_over.md` | Diesel fail-to-start |
+| `sop_cooling_failure.md` | CRAC / thermal |
+| `sop_sla_communication_policy.md` | Tier cadence; no ETA hallucination |
+| `sop_dns_resolver_outage.md` | Recursive DNS |
+| `sop_ntp_clock_skew.md` | Time source |
+| `sop_tls_certificate_expiry.md` | Handshake / chain |
+| `sop_peering_congestion.md` | IX / peer utilization |
+| `sop_transponder_failure.md` | Single wavelength, fiber plant up |
+| `sop_ospf_adjacency_down.md` | IGP neighbor |
+| `sop_mpls_lsp_down.md` | RSVP / LDP LSP |
+| `sop_customer_cpe_down.md` | Last-mile CPE |
+| `sop_ixp_port_down.md` | Exchange switch port |
+
+After re-indexing the 20 files, `tests/test_retrieval.py` still ranks `sop_fiber_cut_metro.md` first for the metro LOS query (score 0.8602). The BGP leak query ranks `sop_bgp_session_flap.md` first (score 0.8605) instead of `sop_bgp_route_leak.md`. That miss is the 5→20 baseline; do not tune the retriever to hide it.`
 
 ## Prerequisites
 
@@ -106,7 +125,7 @@ Opens at [http://localhost:8501](http://localhost:8501).
 ## Tests
 
 ```bash
-pytest -s -v tests/test_retrieval.py      # SOP hit + relevance
+pytest -s -v tests/test_retrieval.py      # SOP hit + relevance (BGP leak may fail after 5→20)
 pytest -s -v tests/test_agent_scenarios.py  # fiber / BGP / power scenarios + guardrails
 pytest -s -v tests/test_rag_evals.py      # DeepEval faithfulness / hallucination
 ```
