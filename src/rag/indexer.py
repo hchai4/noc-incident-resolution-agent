@@ -14,6 +14,7 @@ load_dotenv()
 RUNBOOKS_DIR = os.getenv("RUNBOOKS_DIR", "data/noc_runbooks")
 CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "data/chroma_db")
 COLLECTION_NAME = "noc_runbooks_index"
+HEADER = re.compile(r"^\d+\.\s+", re.M)
 
 
 def load_runbook_documents(directory_path: str):
@@ -101,6 +102,31 @@ def build_alarm_aliases(sop_text: str) -> list[str]:
     return unique
 
 
+def split_sop_into_sections(source_file: str, full_text: str) -> list[dict]:
+    """One chunk per numbered header. Title before '1.' is its own section."""
+    text = full_text.strip()
+    matches = list(HEADER.finditer(text))
+    if not matches:
+        return [{"source_file": source_file, "section": "body", "text": text, "parent": text}]
+    sections = []
+    title = text[: matches[0].start()].strip()
+    if title:
+        sections.append({"source_file": source_file, "section": "title", "text": title, "parent": text})
+    for i, match in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        block = text[match.start() : end].strip()
+        heading = block.splitlines()[0].strip()
+        sections.append(
+            {
+                "source_file": source_file,
+                "section": heading[:80],
+                "text": block,
+                "parent": text,
+            }
+        )
+    return sections
+
+
 def build_vector_index(force_rebuild: bool = True):
     """
     Parses, embeds, and saves SOP runbooks into ChromaDB.
@@ -137,14 +163,29 @@ def build_vector_index(force_rebuild: bool = True):
     for doc in raw_docs:
         source_file = doc.metadata["source_file"]
         full_text = doc.page_content.strip()
-        variants = build_alarm_aliases(full_text) + [full_text]
-        for variant in variants:
-            embed_inputs.append(variant)
-            stored_docs.append(full_text)
+        chunks = split_sop_into_sections(source_file, full_text)
+        for chunk in chunks:
+            embed_inputs.append(chunk["text"])
+            stored_docs.append(chunk["text"])
             metadatas.append(
                 {
                     "source_file": source_file,
-                    "chunk_id": f"{source_file}#chunk-{idx}",
+                    "section": chunk["section"],
+                    "chunk_id": f"{source_file}#{chunk['section']}",
+                    "parent_text": full_text,
+                }
+            )
+            ids.append(f"{source_file}-{idx}")
+            idx += 1
+        for alias in build_alarm_aliases(full_text):
+            embed_inputs.append(alias)
+            stored_docs.append(alias)
+            metadatas.append(
+                {
+                    "source_file": source_file,
+                    "section": "alias",
+                    "chunk_id": f"{source_file}#alias-{idx}",
+                    "parent_text": full_text,
                 }
             )
             ids.append(f"{source_file}-{idx}")

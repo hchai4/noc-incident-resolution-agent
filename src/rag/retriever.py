@@ -28,40 +28,35 @@ def get_vector_store() -> Chroma:
 
 
 def retrieve_sop_context(alarm_query: str, k: int = 2) -> tuple[str, list[dict[str, Any]]]:
-    """
-    Queries ChromaDB with similarity relevance scoring.
-    Returns:
-      - formatted_context: Clean string formatted for LLM system prompts with citations.
-      - raw_evidence: List of dictionaries with metadata, score, and chunk content.
-    """
     vector_store = get_vector_store()
-
-    # Retrieve docs with similarity relevance score (0.0 to 1.0, where 1.0 is exact match)
-    results = vector_store.similarity_search_with_relevance_scores(alarm_query, k=k)
+    results = vector_store.similarity_search_with_relevance_scores(alarm_query, k=max(k * 4, 8))
 
     formatted_context_blocks = []
     raw_evidence = []
+    seen = set()
 
     for doc, score in results:
         source_file = doc.metadata.get("source_file", "unknown_sop.md")
+        if source_file in seen:
+            continue
+        seen.add(source_file)
+        parent = (doc.metadata.get("parent_text") or doc.page_content).strip()
         chunk_id = doc.metadata.get("chunk_id", "chunk-0")
-        clean_content = doc.page_content.strip()
-
-        evidence_entry = {
-            "source_file": source_file,
-            "chunk_id": chunk_id,
-            "relevance_score": round(float(score), 4),
-            "content": clean_content,
-        }
-        raw_evidence.append(evidence_entry)
-
-        # Markdown block for LLM prompt context injection
-        formatted_context_blocks.append(
-            f"--- CITATION: [{source_file}] (Confidence: {score:.2f}) ---\n" f"{clean_content}\n"
+        raw_evidence.append(
+            {
+                "source_file": source_file,
+                "chunk_id": chunk_id,
+                "relevance_score": round(float(score), 4),
+                "content": parent,
+            }
         )
+        formatted_context_blocks.append(
+            f"--- CITATION: [{source_file}] (Confidence: {score:.2f}) ---\n{parent}\n"
+        )
+        if len(raw_evidence) >= k:
+            break
 
-    formatted_context = "\n".join(formatted_context_blocks)
-    return formatted_context, raw_evidence
+    return "\n".join(formatted_context_blocks), raw_evidence
 
 
 if __name__ == "__main__":

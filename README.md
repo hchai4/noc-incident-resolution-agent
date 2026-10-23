@@ -13,7 +13,7 @@ AlarmPayload
     │     SQLite lookup by circuit_id → client, tier, contracted SLA, route
     │
     ├─ 2. SOP retrieval (RAG)
-    │     ChromaDB similarity search over NOC runbooks (k=2) with citations
+    │     Header-section embeddings + alarm aliases; small-to-big parent SOP (k=2 files)
     │
     ├─ 3. Constrained generation
     │     gpt-4o-mini via Instructor → IncidentNotificationDraft (Pydantic)
@@ -30,8 +30,8 @@ The agent must not invent a restoration ETA. If field confirmation is missing, i
 app/app.py                      Streamlit HITL console
 src/schemas.py                  AlarmPayload + IncidentNotificationDraft
 src/telemetry_db.py             SQLite circuit catalog (seed + lookup)
-src/rag/indexer.py              Embed SOP runbooks into ChromaDB
-src/rag/retriever.py            Cited SOP retrieval
+src/rag/indexer.py              Split SOPs on numbered headers; embed sections + aliases
+src/rag/retriever.py            Search sections, return parent SOP (small-to-big)
 src/agent/incident_agent.py     End-to-end drafting pipeline
 src/agent/guardrails.py         Tenant isolation + SLA compliance
 data/noc_runbooks/              Markdown SOP source files (20; 4 are distractors)
@@ -79,7 +79,7 @@ SOP corpus is 20 runbooks in `data/noc_runbooks/`. Four of them are near-neighbo
 | `sop_customer_cpe_down.md` | Last-mile CPE |
 | `sop_ixp_port_down.md` | Exchange switch port |
 
-After re-indexing the 20 files, `tests/test_retrieval.py` still ranks `sop_fiber_cut_metro.md` first for the metro LOS query (score 0.8602). The BGP leak query ranks `sop_bgp_session_flap.md` first (score 0.8605) instead of `sop_bgp_route_leak.md`. That miss is part of the 5→20 baseline; do not tune the retriever to hide it.
+After the 5→20 expansion, whole-document retrieval ranked a BGP leak query as `sop_bgp_session_flap.md`. Header chunks plus small-to-big (10/22) raised hit@1 on the same 45 queries; hybrid BM25 is not in this retriever yet.
 
 ## Prerequisites
 
@@ -125,26 +125,25 @@ Opens at [http://localhost:8501](http://localhost:8501).
 2. Generate an incident draft (RAG + structured LLM output).
 3. Review retrieved runbook citations, edit the customer email, and dispatch.
 
-## Evaluation (retrieval baseline)
+## Evaluation (retrieval)
 
-`evals/golden_set.jsonl` is the answer key: 45 alarm strings, 35 with one expected SOP and 10 negatives that must not look like a runbook incident. `evals/retrieval_metrics.py` sends each query through `retrieve_sop_context` (`k=2`) and scores filename match. It does not draft mail and does not use DeepEval. Query embedding still needs `OPENAI_API_KEY`.
+`evals/golden_set.jsonl` is the answer key: 45 alarm strings, 35 with one expected SOP and 10 negatives that must not look like a runbook incident. `evals/retrieval_metrics.py` sends each query through `retrieve_sop_context` (`k=2` parent files) and scores filename match. It does not draft mail and does not use DeepEval. Query embedding still needs `OPENAI_API_KEY`.
 
-From the repo root:
+The indexer splits each runbook on numbered headers (`1. Scope & Symptoms`, …), embeds those sections plus alarm aliases, and stores the full SOP as `parent_text`. The retriever searches extra section hits, then returns at most two unique parent files (small-to-big). Rebuild the index after pulling indexer changes:
 
 ```bash
+uv run python -m src.rag.indexer
 PYTHONPATH=. uv run python evals/retrieval_metrics.py
 ```
 
-Baseline on 2026-10-21 (whole-document + alarm aliases, no hybrid, no rerank), also stored in `evals/results.md`:
+Numbers in `evals/results.md` (same 45 rows, no BM25, no rerank):
 
-| Metric | Value |
-|---|---|
-| hit@1 | 0.771 |
-| hit@2 | 0.914 |
-| MRR | 0.843 |
-| false-positive rate @ 0.65 | 0.000 |
+| Date | Retriever | hit@1 | hit@2 | MRR | FP @ 0.65 |
+|---|---|---|---|---|---|
+| 2026-10-21 | Whole document + aliases | 0.771 | 0.914 | 0.843 | 0.000 |
+| 2026-10-22 | Header sections + aliases, parent SOP | 0.800 | 0.971 | 0.886 | 0.000 |
 
-`tests/test_retrieval.py` can still fail on the single BGP leak string. The 45-row table is the number to quote, not that one assert.
+`tests/test_retrieval.py` can still fail on the single BGP leak string. Quote the 45-row table, not that one assert.
 
 ## Tests
 
