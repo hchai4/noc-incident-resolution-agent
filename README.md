@@ -13,7 +13,7 @@ AlarmPayload
     │     SQLite lookup by circuit_id → client, tier, contracted SLA, route
     │
     ├─ 2. SOP retrieval (RAG)
-    │     Header-section embeddings + alarm aliases; small-to-big parent SOP (k=2 files)
+    │     Header chunks + BM25, fused with RRF; small-to-big parent SOP (k=2 files)
     │
     ├─ 3. Constrained generation
     │     gpt-4o-mini via Instructor → IncidentNotificationDraft (Pydantic)
@@ -31,7 +31,8 @@ app/app.py                      Streamlit HITL console
 src/schemas.py                  AlarmPayload + IncidentNotificationDraft
 src/telemetry_db.py             SQLite circuit catalog (seed + lookup)
 src/rag/indexer.py              Split SOPs on numbered headers; embed sections + aliases
-src/rag/retriever.py            Search sections, return parent SOP (small-to-big)
+src/rag/hybrid.py               BM25 over sections/aliases; RRF fuse with dense ranks
+src/rag/retriever.py            Dense + BM25 RRF, return parent SOP (small-to-big)
 src/agent/incident_agent.py     End-to-end drafting pipeline
 src/agent/guardrails.py         Tenant isolation + SLA compliance
 data/noc_runbooks/              Markdown SOP source files (20; 4 are distractors)
@@ -79,7 +80,7 @@ SOP corpus is 20 runbooks in `data/noc_runbooks/`. Four of them are near-neighbo
 | `sop_customer_cpe_down.md` | Last-mile CPE |
 | `sop_ixp_port_down.md` | Exchange switch port |
 
-After the 5→20 expansion, whole-document retrieval ranked a BGP leak query as `sop_bgp_session_flap.md`. Header chunks plus small-to-big (10/22) raised hit@1 on the same 45 queries; hybrid BM25 is not in this retriever yet.
+After the 5→20 expansion, whole-document retrieval ranked a BGP leak query as `sop_bgp_session_flap.md`. Header chunks plus small-to-big (10/22) raised hit@1. Hybrid BM25 + RRF (10/23) fuses lexical ranks with dense ranks; on this set hit@1 did not beat 10/22. Cross-encoder rerank is not in this retriever yet.
 
 ## Prerequisites
 
@@ -129,19 +130,20 @@ Opens at [http://localhost:8501](http://localhost:8501).
 
 `evals/golden_set.jsonl` is the answer key: 45 alarm strings, 35 with one expected SOP and 10 negatives that must not look like a runbook incident. `evals/retrieval_metrics.py` sends each query through `retrieve_sop_context` (`k=2` parent files) and scores filename match. It does not draft mail and does not use DeepEval. Query embedding still needs `OPENAI_API_KEY`.
 
-The indexer splits each runbook on numbered headers (`1. Scope & Symptoms`, …), embeds those sections plus alarm aliases, and stores the full SOP as `parent_text`. The retriever searches extra section hits, then returns at most two unique parent files (small-to-big). Rebuild the index after pulling indexer changes:
+The indexer splits each runbook on numbered headers (`1. Scope & Symptoms`, …), embeds those sections plus alarm aliases, and stores the full SOP as `parent_text`. The retriever searches extra dense hits, ranks the same sections with BM25, fuses both lists with RRF (`1 / (60 + rank)`), then returns at most two unique parent files. `relevance_score` in evidence is still the dense cosine so false-positive @ 0.65 stays comparable. BM25 reads markdown from disk; rebuild Chroma only after indexer changes:
 
 ```bash
 uv run python -m src.rag.indexer
 PYTHONPATH=. uv run python evals/retrieval_metrics.py
 ```
 
-Numbers in `evals/results.md` (same 45 rows, no BM25, no rerank):
+Numbers in `evals/results.md` (same 45 rows, no cross-encoder):
 
 | Date | Retriever | hit@1 | hit@2 | MRR | FP @ 0.65 |
 |---|---|---|---|---|---|
 | 2026-10-21 | Whole document + aliases | 0.771 | 0.914 | 0.843 | 0.000 |
 | 2026-10-22 | Header sections + aliases, parent SOP | 0.800 | 0.971 | 0.886 | 0.000 |
+| 2026-10-23 | Dense + BM25, RRF k=60 | 0.771 | 0.971 | 0.871 | 0.000 |
 
 `tests/test_retrieval.py` can still fail on the single BGP leak string. Quote the 45-row table, not that one assert.
 
