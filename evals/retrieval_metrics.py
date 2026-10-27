@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from src.rag.rerank import ABSTAIN_THRESHOLD
 from src.rag.retriever import retrieve_sop_context
 
 GOLDEN = Path("evals/golden_set.jsonl")
@@ -41,15 +42,27 @@ def main():
     fp = 0
     for row in negatives:
         _, evidence = retrieve_sop_context(row["query"], k=K)
-        top = evidence[0]["relevance_score"] if evidence else 0.0
-        if top >= FP_THRESHOLD:
+        if not evidence:
+            continue  # abstain: not a false positive
+        if evidence[0]["relevance_score"] >= ABSTAIN_THRESHOLD:
             fp += 1
 
     print(f"positives={n}  hit@1={hits1/n:.3f}  hit@2={hits2/n:.3f}  MRR={mrr_sum/n:.3f}")
-    print(f"negatives={len(negatives)}  false_positive_rate@{FP_THRESHOLD}={fp/len(negatives):.3f}")
+    print(f"negatives={len(negatives)}  false_positive_rate@T{FP_THRESHOLD}={fp/len(negatives):.3f}")
     print("misses:")
     for item in misses:
         print(" ", item)
+
+    print("pos top CE:", sorted(top_ce(r) for r in positives if top_ce(r) is not None))
+    print("neg abstain:", sum(top_ce(r) is None for r in negatives), "/", len(negatives))
+    print("neg top CE:", sorted(s for r in negatives if (s := top_ce(r)) is not None))
+
+
+def top_ce(row):
+    evidence = retrieve_sop_context(row["query"], k=2)[1]
+    if not evidence:
+        return None  # abstain
+    return evidence[0]["relevance_score"]
 
 
 if __name__ == "__main__":
