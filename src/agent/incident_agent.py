@@ -41,6 +41,11 @@ class IncidentAgent:
         # Step 2: Unstructured SOP Knowledge Retrieval
         rag_query = f"{alarm.alarm_type}: {alarm.raw_symptom}"
         sop_context, raw_evidence = retrieve_sop_context(rag_query, k=2)
+        if not raw_evidence:
+            sop_context = (
+                "NO MATCHING SOP. Do not invent mitigation from a runbook. "
+                "Escalate to a human operator. Use the SLA update window only."
+            )
 
         # Step 3: Prompt Construction with Guardrailed Context
         system_prompt = f"""
