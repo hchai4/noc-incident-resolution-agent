@@ -42,7 +42,10 @@ data/circuits_telemetry.db      Generated SQLite DB (after seed)
 data/chroma_db/                 Generated vector index (after index)
 evals/golden_set.jsonl          45 labeled alarms (35 positive, 10 negative)
 evals/retrieval_metrics.py      hit@1 / hit@2 / MRR / false-positive rate
-evals/results.md                Retrieval baseline numbers
+evals/faithfulness_scenarios.jsonl  5 end-to-end alarms (4 SOP types + 1 must-abstain)
+evals/faithfulness_eval.py      DeepEval faithfulness + factual alignment; writes JSON
+evals/faithfulness_results.json Latest offline scores + timestamp (read by the console)
+evals/results.md                Retrieval and faithfulness numbers by date
 tests/                          Scenario, retrieval, and DeepEval tests
 ```
 
@@ -153,23 +156,47 @@ Numbers in `evals/results.md` (same 45 rows):
 
 T=0.5 is from the CE lists: 34 positives ≥ 0.97, one at -0.45; leftover negatives at T=-9 scored -8.66, -8.21, -1.62. At T=0.5, `pos-12` (BGP leak) abstains, so hit@2 drops and that row is the only miss. `tests/test_retrieval.py` can still fail on the single BGP leak string. Quote the 45-row table, not that one assert.
 
+## Evaluation (faithfulness)
+
+Retrieval metrics only check filenames. `evals/faithfulness_eval.py` runs the **whole agent** (retrieval at T=0.5 → `gpt-4o-mini` draft → guardrails) on the 5 alarms in `evals/faithfulness_scenarios.jsonl` — one per supported alarm type plus one billing question that must abstain — and judges the customer email with DeepEval on `gpt-4o-mini`:
+
+- **Faithfulness**: every claim in the email is supported by the SOP text the agent actually retrieved. 1.0 = fully grounded.
+- **Factual alignment** (DeepEval `HallucinationMetric`): the email does not contradict SOP + telemetry. This metric also penalizes **omitting** a context fact, so it reads lower than faithfulness.
+
+```bash
+uv run python -m src.telemetry_db                      # once; seeds circuits
+RETRIEVAL_ABSTAIN_THRESHOLD=0.5 PYTHONPATH=. uv run python evals/faithfulness_eval.py
+```
+
+Each run costs 5 drafts + 10 judge calls and overwrites `evals/faithfulness_results.json` with per-scenario scores, judge reasons, cited files, guardrail flags, and a UTC timestamp. That JSON is committed on purpose: the Streamlit console reads it and CI has no OpenAI key.
+
+Run of 2026-10-26 (judge `gpt-4o-mini`, threshold 0.85, T=0.5):
+
+| Scenario | Cited SOP | Faithfulness | Factual alignment | Guardrails |
+|---|---|---|---|---|
+| FIBER_CUT | `sop_fiber_cut_metro.md` | 0.88 | 0.50 | pass |
+| BGP_LEAK | `sop_bgp_route_leak.md` | 1.00 | 0.50 | pass |
+| POWER_FAIL | `sop_power_outage_datacenter.md` | 0.89 | 1.00 | pass |
+| DDOS | `sop_ddos_mitigation.md` | 0.89 | 0.50 | pass |
+| INFO (no incident) | abstained | 0.80 | 0.50 | pass |
+
+Faithfulness mean 0.891 (min 0.80); factual alignment mean 0.600 (min 0.50); retrieval correct 5/5; guardrails 5/5. The sub-0.85 faithfulness rows are wording, not retrieval: the fiber email implied "updates until resolution" where the SOP says every 60 minutes; the power email said 45-minute updates where the generator SOP says 15; the DDoS email repeated the alarm's 65 Gbps against the SOP's 50 Gbps threshold; the abstain email asserted "all circuits green" when the context only said escalate. Three 0.50 alignment rows are the judge flagging omitted SLA / cadence facts, not invented ones; reasons are in the JSON.
+
+The console's right panel shows the mean scores, the matching scenario row for the selected alarm type, the judge model, and the `measured_at` timestamp, labelled as **offline** scores from this file. It does not score the draft on screen.
+
 ## Tests
 
 ```bash
 PYTHONPATH=. uv run python evals/retrieval_metrics.py  # 45-row retrieval baseline
 pytest -s -v tests/test_retrieval.py      # SOP hit + relevance (BGP leak may fail after 5→20)
 pytest -s -v tests/test_agent_scenarios.py  # fiber / BGP / power scenarios + guardrails
-pytest -s -v tests/test_rag_evals.py      # DeepEval faithfulness / hallucination
+pytest -s -v tests/test_rag_evals.py      # 2-scenario pytest form of the faithfulness eval (asserts >= 0.85)
+RETRIEVAL_ABSTAIN_THRESHOLD=0.5 PYTHONPATH=. uv run python evals/faithfulness_eval.py  # 5-scenario run, writes JSON
 ```
 
-`pytest.ini` sets `pythonpath = .` so `src.*` imports resolve from the repo root. The metrics script does not read `pytest.ini`; that is why `PYTHONPATH=.` is required.
+`pytest.ini` sets `pythonpath = .` so `src.*` imports resolve from the repo root. The metrics scripts do not read `pytest.ini`; that is why `PYTHONPATH=.` is required.
 
-DeepEval thresholds in `tests/test_rag_evals.py`:
-
-- Faithfulness ≥ 0.85
-- Hallucination (factual alignment) ≥ 0.85
-
-Those eval tests call the live model and consume OpenAI quota.
+`tests/test_rag_evals.py` uses the same DeepEval metrics and 0.85 threshold as `evals/faithfulness_eval.py`, on two alarms (fiber cut, BGP leak), and fails the test instead of writing a file. Both call the live model and consume OpenAI quota; neither runs in CI.
 
 ## Guardrails
 

@@ -7,6 +7,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 import datetime
+import json
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -44,6 +45,15 @@ def load_agent():
 
 
 agent = load_agent()
+
+_RESULTS_PATH = _PROJECT_ROOT / "evals" / "faithfulness_results.json"
+
+
+@st.cache_data(ttl=60)
+def load_faithfulness_report() -> dict | None:
+    if not _RESULTS_PATH.exists():
+        return None
+    return json.loads(_RESULTS_PATH.read_text())
 
 
 def fetch_all_circuits():
@@ -215,11 +225,29 @@ with col_right:
             st.caption(f"Allowed window is <= {max_minutes} mins.")
 
         st.divider()
-        st.markdown("**Evaluation**")
-        st.caption(
-            "Faithfulness and hallucination are measured offline in "
-            "`tests/test_rag_evals.py` (DeepEval, threshold 0.85). "
-            "This console does not show a live score."
-        )
+        st.markdown("**Evaluation (offline LLM-as-judge)**")
+        report = load_faithfulness_report()
+        if report is None:
+            st.caption("No `evals/faithfulness_results.json` yet. Run `evals/faithfulness_eval.py`.")
+        else:
+            summary = report["summary"]
+            m1, m2 = st.columns(2)
+            m1.metric("Faithfulness (mean)", f"{summary['faithfulness_mean']:.2f}")
+            m2.metric("Factual alignment (mean)", f"{summary['hallucination_mean']:.2f}")
+            match = next(
+                (s for s in report["scenarios"] if s["alarm_type"] == res["alarm"].alarm_type),
+                None,
+            )
+            if match:
+                cited = match["cited_files"][0] if match["cited_files"] else "abstained"
+                st.caption(
+                    f"{match['alarm_type']} scenario: faithfulness {match['faithfulness']:.2f}, "
+                    f"alignment {match['hallucination']:.2f}, cited `{cited}`."
+                )
+            st.caption(
+                f"Judge {report['judge_model']}, threshold {report['threshold']}, "
+                f"abstain T={report['retrieval_abstain_threshold']}, measured {report['measured_at']}. "
+                "Scores are from the offline scenario run, not this draft."
+            )
     else:
         st.caption("Awaiting a draft to show guardrail results.")

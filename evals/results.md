@@ -44,3 +44,26 @@ Same golden set. RRF shortlist of 8 files, `ms-marco-MiniLM-L-6-v2` on (query, p
 | Rerank + abstain (T=0.5) | 0.857 | 0.971 | 0.914 | n/a |
 
 Notes: T=0.5 from pos vs neg CE lists (34 positives ≥ 0.97, one -0.45). T=-9: misses empty; 7/10 negatives already abstain; remaining neg CE -8.66, -8.21, -1.62. T=0.5: all 10 negatives abstain; miss is `pos-12` `sop_bgp_route_leak.md` with empty evidence. Do not compare FP to cosine @ 0.65; an earlier print of 1.000 reused the last positive's evidence and was not ten false positives.
+
+
+# Faithfulness eval (2026-10-26)
+
+5 scenarios in `evals/faithfulness_scenarios.jsonl`, full agent (retrieval T=0.5 → gpt-4o-mini draft → guardrails).
+Judge: DeepEval FaithfulnessMetric + HallucinationMetric on gpt-4o-mini, threshold 0.85. Raw JSON: `evals/faithfulness_results.json`.
+
+| Scenario | Cited SOP | Faithfulness | Factual alignment | Guardrails |
+|---|---|---|---|---|
+| FIBER_CUT | `sop_fiber_cut_metro.md` | 0.88 | 0.50 | pass |
+| BGP_LEAK | `sop_bgp_route_leak.md` | 1.00 | 0.50 | pass |
+| POWER_FAIL | `sop_power_outage_datacenter.md` | 0.89 | 1.00 | pass |
+| DDOS | `sop_ddos_mitigation.md` | 0.89 | 0.50 | pass |
+| INFO | `abstained` | 0.80 | 0.50 | pass |
+
+Summary: faithfulness mean 0.891 / min 0.800; factual alignment mean 0.600 / min 0.500; retrieval correct 5/5; guardrails 5/5.
+Notes (judge reasons, from the JSON):
+- FIBER_CUT 0.88: email implied updates continue until resolution; SOP only says every 60 minutes.
+- POWER_FAIL 0.89: email said 45-minute updates; generator fail-over SOP says 15.
+- DDOS 0.89: email repeated the alarm's 65 Gbps as the attack size against the SOP's 50 Gbps threshold.
+- INFO 0.80: abstain email asserted "all circuits green"; context only said NO MATCHING SOP, escalate.
+- Factual alignment 0.50 rows (fiber, bgp, ddos, abstain) cite omitted SLA / cadence facts, not invented ones. HallucinationMetric penalizes omission; faithfulness is the headline metric.
+- Retrieval 5/5 and guardrails 5/5: none of the deviations are retrieval or guardrail failures. No prompt tuning done today.

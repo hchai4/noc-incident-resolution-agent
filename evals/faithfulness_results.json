@@ -1,0 +1,109 @@
+{
+  "measured_at": "2026-10-28T04:40:17+00:00",
+  "judge_model": "gpt-4o-mini",
+  "threshold": 0.85,
+  "retrieval_abstain_threshold": 0.5,
+  "scenario_count": 5,
+  "summary": {
+    "faithfulness_mean": 0.891,
+    "faithfulness_min": 0.8,
+    "hallucination_mean": 0.6,
+    "hallucination_min": 0.5,
+    "retrieval_correct": 5,
+    "guardrails_passed": 5
+  },
+  "scenarios": [
+    {
+      "id": "fiber",
+      "alarm_type": "FIBER_CUT",
+      "circuit_id": "IEPL-9021-LAX-TYO",
+      "expected_sop": "sop_fiber_cut_metro.md",
+      "cited_files": [
+        "sop_fiber_cut_metro.md",
+        "sop_fiber_cut_longhaul.md"
+      ],
+      "abstained": false,
+      "retrieval_correct": true,
+      "faithfulness": 0.875,
+      "faithfulness_reason": "The score is 0.88 because the actual output implies that updates will continue until resolution, which contradicts the context that only specifies updates every 60 minutes without confirming ongoing updates.",
+      "hallucination": 0.5,
+      "hallucination_reason": "The score is 0.50 because the actual output aligns with the context regarding the SOP for Loss of Signal but contradicts it by omitting the critical detail of the 4-hour recovery objective for metro incidents.",
+      "tenant_isolation_passed": true,
+      "sla_compliance_passed": true,
+      "next_update_window_minutes": 60
+    },
+    {
+      "id": "bgp",
+      "alarm_type": "BGP_LEAK",
+      "circuit_id": "DIA-4410-SFO-JFK",
+      "expected_sop": "sop_bgp_route_leak.md",
+      "cited_files": [
+        "sop_bgp_route_leak.md",
+        "sop_ospf_adjacency_down.md"
+      ],
+      "abstained": false,
+      "retrieval_correct": true,
+      "faithfulness": 1.0,
+      "faithfulness_reason": "The score is 1.00 because there are no contradictions present, indicating that the actual output aligns perfectly with the retrieval context.",
+      "hallucination": 0.5,
+      "hallucination_reason": "The score is 0.50 because the actual output aligns with the context regarding the BGP route leak but contradicts the mandatory client notification cadence, leading to a moderate level of inconsistency.",
+      "tenant_isolation_passed": true,
+      "sla_compliance_passed": true,
+      "next_update_window_minutes": 20
+    },
+    {
+      "id": "power",
+      "alarm_type": "POWER_FAIL",
+      "circuit_id": "METRO-3301-ORD-CHI",
+      "expected_sop": "sop_power_outage_datacenter.md",
+      "cited_files": [
+        "sop_power_outage_datacenter.md",
+        "sop_generator_fail_over.md"
+      ],
+      "abstained": false,
+      "retrieval_correct": true,
+      "faithfulness": 0.889,
+      "faithfulness_reason": "The score is 0.89 because the actual output incorrectly states that updates occur every 45 minutes during a generator fail-to-start situation, while the retrieval context specifies that they should occur every 15 minutes.",
+      "hallucination": 1.0,
+      "hallucination_reason": "The score is 1.00 because the actual output fully aligns with the provided context, confirming the details of the mains utility grid failure and the subsequent actions taken without any contradictions.",
+      "tenant_isolation_passed": true,
+      "sla_compliance_passed": true,
+      "next_update_window_minutes": 45
+    },
+    {
+      "id": "ddos",
+      "alarm_type": "DDOS",
+      "circuit_id": "IPLC-8812-LON-FRA",
+      "expected_sop": "sop_ddos_mitigation.md",
+      "cited_files": [
+        "sop_ddos_mitigation.md",
+        "sop_application_layer_attack.md"
+      ],
+      "abstained": false,
+      "retrieval_correct": true,
+      "faithfulness": 0.889,
+      "faithfulness_reason": "The score is 0.89 because the actual output claims a DDoS attack exceeded 65 Gbps, which contradicts the retrieval context stating the SOP-NET-04 threshold is 50 Gbps.",
+      "hallucination": 0.5,
+      "hallucination_reason": "The score is 0.50 because the actual output aligns with the context regarding the nature of the DDoS attack and mitigation actions, but it contradicts the specified SLA for response time, leading to a moderate level of inconsistency.",
+      "tenant_isolation_passed": true,
+      "sla_compliance_passed": true,
+      "next_update_window_minutes": 30
+    },
+    {
+      "id": "abstain",
+      "alarm_type": "INFO",
+      "circuit_id": "IEPL-9021-LAX-TYO",
+      "expected_sop": null,
+      "cited_files": [],
+      "abstained": true,
+      "retrieval_correct": true,
+      "faithfulness": 0.8,
+      "faithfulness_reason": "The score is 0.80 because the actual output contradicts the retrieval context by implying that all circuits can be confirmed as green and without alarms, despite the context stating that there is no matching Standard Operating Procedure (SOP) for verification.",
+      "hallucination": 0.5,
+      "hallucination_reason": "The score is 0.50 because while the actual output correctly identifies the Incident ID and Circuit ID and confirms that all circuits are green with no alarms, it contradicts the context by stating that the issue was escalated to a human operator, which should only occur if there is no matching SOP.",
+      "tenant_isolation_passed": true,
+      "sla_compliance_passed": true,
+      "next_update_window_minutes": 240
+    }
+  ]
+}

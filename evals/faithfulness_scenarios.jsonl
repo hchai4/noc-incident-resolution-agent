@@ -1,0 +1,5 @@
+{"id": "fiber", "circuit_id": "IEPL-9021-LAX-TYO", "alarm_type": "FIBER_CUT", "raw_symptom": "OTDR reflection indicates physical fiber conduit break at KM 34.2", "expected_sop": "sop_fiber_cut_metro.md", "expect_abstain": false}
+{"id": "bgp", "circuit_id": "DIA-4410-SFO-JFK", "alarm_type": "BGP_LEAK", "raw_symptom": "Unauthorized route prefixes announced from upstream peer AS64512, AS-path leak on the edge", "expected_sop": "sop_bgp_route_leak.md", "expect_abstain": false}
+{"id": "power", "circuit_id": "METRO-3301-ORD-CHI", "alarm_type": "POWER_FAIL", "raw_symptom": "Mains utility grid failure, automatic transfer switch engaged generator", "expected_sop": "sop_power_outage_datacenter.md", "expect_abstain": false}
+{"id": "ddos", "circuit_id": "IPLC-8812-LON-FRA", "alarm_type": "DDOS", "raw_symptom": "Volumetric ingress saturation exceeding 65 Gbps targeting client subnet", "expected_sop": "sop_ddos_mitigation.md", "expect_abstain": false}
+{"id": "abstain", "circuit_id": "IEPL-9021-LAX-TYO", "alarm_type": "INFO", "raw_symptom": "Customer asking for a copy of last month's invoice, all circuits green, no alarm", "expected_sop": null, "expect_abstain": true}
